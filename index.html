@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🏁 Emoticon Racer → Apenas Automóveis | Cores Vivas</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(145deg, #0a1c24 0%, #031016 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .game-horizon {
+            background: #0f2a2f;
+            border-radius: 48px;
+            padding: 20px 25px 25px 25px;
+            box-shadow: 0 20px 30px rgba(0, 0, 0, 0.6), inset 0 1px 2px rgba(255,255,255,0.08);
+            border: 1px solid rgba(80, 180, 200, 0.5);
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 28px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+            cursor: none;
+            background-color: #141f1c;
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 30px;
+            margin-top: 20px;
+            margin-bottom: 12px;
+            padding: 12px 20px;
+            background: #0a2025;
+            border-radius: 60px;
+            backdrop-filter: blur(2px);
+            border: 1px solid #48b5c0;
+        }
+
+        .stats {
+            display: flex;
+            gap: 32px;
+            font-weight: bold;
+            background: #05242b;
+            padding: 6px 24px;
+            border-radius: 40px;
+            box-shadow: inset 0 1px 3px #00000066, 0 2px 5px rgba(0,0,0,0.4);
+        }
+
+        .stat {
+            text-align: center;
+            color: #e0f7fa;
+            text-shadow: 0 2px 2px black;
+        }
+
+        .stat span:first-child {
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            background: #1f6d7a;
+            padding: 2px 12px;
+            border-radius: 50px;
+            display: inline-block;
+        }
+
+        .stat-value {
+            font-size: 1.9rem;
+            font-weight: 800;
+            font-family: monospace;
+            margin-left: 8px;
+            color: #ff9040;
+            text-shadow: 0 0 6px #ff5500;
+        }
+
+        button {
+            background: #0fbbb0;
+            border: none;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 8px 24px;
+            border-radius: 60px;
+            color: #02212e;
+            font-family: monospace;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 4px 0 #048b7a;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #048b7a;
+        }
+
+        .controls-tip {
+            display: flex;
+            gap: 18px;
+            background: #0a232ad9;
+            backdrop-filter: blur(10px);
+            padding: 6px 18px;
+            border-radius: 60px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #b8f2ff;
+        }
+
+        .controls-tip kbd {
+            background: #173e46;
+            padding: 3px 10px;
+            border-radius: 30px;
+            font-weight: bold;
+            color: #9efff0;
+            margin: 0 4px;
+            box-shadow: inset 0 1px 0 #2ea5b0, 0 1px 2px black;
+        }
+
+        @media (max-width: 780px) {
+            .stats { gap: 12px; padding: 4px 12px; }
+            .stat-value { font-size: 1.5rem; }
+            button { padding: 5px 20px; font-size: 1rem;}
+            .controls-tip { font-size: 0.7rem; gap: 8px;}
+        }
+    </style>
+</head>
+<body>
+<div>
+    <div class="game-horizon">
+        <canvas id="gameCanvas" width="700" height="450"></canvas>
+        <div class="info-panel">
+            <div class="stats">
+                <div class="stat">
+                    <span>🏆 PONTOS</span>
+                    <span class="stat-value" id="scoreDisplay">0</span>
+                </div>
+                <div class="stat">
+                    <span>⭐ RECORDE</span>
+                    <span class="stat-value" id="highScoreDisplay">0</span>
+                </div>
+            </div>
+            <button id="resetButton">🔄 REINICIAR</button>
+        </div>
+        <div class="controls-tip">
+            <span>🎮 ↑ ↓  ou  W / S  (mover vertical)</span>
+            <span>⚡ <kbd>R</kbd> reiniciar</span>
+            <span>🚗← OBSTÁCULOS: apenas AUTOMÓVEIS (espelhados)</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ========== JOGO APENAS COM EMOTICONS DE AUTOMÓVEIS ==========
+        // Lista de veículos: carros, caminhonetes, vans, táxis, polícia, bombeiro, etc.
+        const VEHICLE_EMOJIS = [
+            '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', 
+            '🛺', '🚚', '🚛', '🚜', '🏍️', '🛵', '🚲', '🚔', '🚖', '🚘'
+        ];
+        
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreSpan = document.getElementById('scoreDisplay');
+        const highScoreSpan = document.getElementById('highScoreDisplay');
+        const resetBtn = document.getElementById('resetButton');
+        
+        const W = 700;
+        const H = 450;
+        canvas.width = W;
+        canvas.height = H;
+        
+        // JOGADOR (também um carro, mas o protagonista)
+        const PLAYER_WIDTH = 48;
+        const PLAYER_HEIGHT = 48;
+        const PLAYER_EMOJI = '🚗';   // carro do jogador
+        const playerX = 52;
+        let playerY = H/2 - PLAYER_HEIGHT/2;
+        let upPressed = false;
+        let downPressed = false;
+        const VERT_SPEED = 6.2;
+        const minY = 8;
+        const maxY = H - PLAYER_HEIGHT - 8;
+        
+        // OBSTÁCULOS (apenas veículos)
+        let obstacles = [];
+        
+        let currentSpeed = 3.4;
+        let framesUntilSpawn = 16;
+        let minSpawnDelay = 34;
+        let maxSpawnDelay = 68;
+        
+        let gameActive = true;
+        let score = 0;
+        let highScore = 0;
+        
+        // ----- Funções auxiliares -----
+        function updateUI() {
+            scoreSpan.innerText = score;
+            if(score > highScore) {
+                highScore = score;
+                highScoreSpan.innerText = highScore;
+            }
+        }
+        
+        function addPoints(amount) {
+            if(!gameActive) return;
+            score += amount;
+            updateUI();
+            updateDifficulty();
+        }
+        
+        function updateDifficulty() {
+            let newSpeed = 3.4 + Math.floor(score / 400);
+            if(newSpeed > 8.6) newSpeed = 8.6;
+            currentSpeed = newSpeed;
+            
+            let newMin = 34 - Math.floor(score / 210);
+            let newMax = 68 - Math.floor(score / 180);
+            if(newMin < 16) newMin = 16;
+            if(newMax < 24) newMax = 24;
+            if(newMin > newMax) newMin = newMax - 3;
+            minSpawnDelay = Math.floor(newMin);
+            maxSpawnDelay = Math.floor(newMax);
+        }
+        
+        function spawnObstacle() {
+            const randY = Math.random() * (H - PLAYER_HEIGHT);
+            const randomVehicle = VEHICLE_EMOJIS[Math.floor(Math.random() * VEHICLE_EMOJIS.length)];
+            obstacles.push({
+                x: W,
+                y: randY,
+                width: PLAYER_WIDTH,
+                height: PLAYER_HEIGHT,
+                emoji: randomVehicle
+            });
+        }
+        
+        function resetGame() {
+            gameActive = true;
+            score = 0;
+            obstacles = [];
+            playerY = H/2 - PLAYER_HEIGHT/2;
+            upPressed = false;
+            downPressed = false;
+            currentSpeed = 3.4;
+            minSpawnDelay = 34;
+            maxSpawnDelay = 68;
+            framesUntilSpawn = 12;
+            updateUI();
+            if(highScore > 0) highScoreSpan.innerText = highScore;
+            else highScoreSpan.innerText = "0";
+        }
+        
+        function checkCollision(playerRect, obsRect) {
+            return (playerRect.x < obsRect.x + obsRect.width &&
+                    playerRect.x + playerRect.width > obsRect.x &&
+                    playerRect.y < obsRect.y + obsRect.height &&
+                    playerRect.y + playerRect.height > obsRect.y);
+        }
+        
+        function updateGame() {
+            if(!gameActive) return;
+            
+            if(upPressed && playerY > minY) {
+                playerY -= VERT_SPEED;
+                if(playerY < minY) playerY = minY;
+            }
+            if(downPressed && playerY < maxY) {
+                playerY += VERT_SPEED;
+                if(playerY > maxY) playerY = maxY;
+            }
+            
+            for(let i = 0; i < obstacles.length; i++) {
+                obstacles[i].x -= currentSpeed;
+            }
+            
+            obstacles = obstacles.filter(obs => {
+                if(obs.x + obs.width < 0) {
+                    addPoints(10);
+                    return false;
+                }
+                return true;
+            });
+            
+            const playerRect = {
+                x: playerX,
+                y: playerY,
+                width: PLAYER_WIDTH,
+                height: PLAYER_HEIGHT
+            };
+            for(let i = 0; i < obstacles.length; i++) {
+                const obsRect = {
+                    x: obstacles[i].x,
+                    y: obstacles[i].y,
+                    width: obstacles[i].width,
+                    height: obstacles[i].height
+                };
+                if(checkCollision(playerRect, obsRect)) {
+                    gameActive = false;
+                    break;
+                }
+            }
+            
+            if(gameActive) {
+                if(framesUntilSpawn <= 0) {
+                    spawnObstacle();
+                    const delay = Math.floor(Math.random() * (maxSpawnDelay - minSpawnDelay + 1) + minSpawnDelay);
+                    framesUntilSpawn = delay;
+                } else {
+                    framesUntilSpawn--;
+                }
+            }
+        }
+        
+        // ========== RENDERIZAÇÃO COM FLIP (espelhado) E CORES VIVAS ==========
+        function drawFlippedEmoji(emoji, x, y, width, height) {
+            ctx.save();
+            const centerX = x + width / 2;
+            const centerY = y + height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.scale(-1, 1);
+            ctx.translate(-centerX, -centerY);
+            ctx.font = `${Math.min(width, height) * 1.05}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui`;
+            ctx.textBaseline = "top";
+            ctx.fillStyle = "#FFFFFF";
+            ctx.shadowBlur = 0;
+            ctx.fillText(emoji, x, y);
+            ctx.restore();
+        }
+        
+        function drawPlayer() {
+            drawFlippedEmoji(PLAYER_EMOJI, playerX, playerY, PLAYER_WIDTH, PLAYER_HEIGHT);
+        }
+        
+        function drawObstacles() {
+            for(let obs of obstacles) {
+                drawFlippedEmoji(obs.emoji, obs.x, obs.y, obs.width, obs.height);
+            }
+        }
+        
+        // --- CENÁRIO COM CORES VIVAS (sem amarelo) ---
+        function drawBackground() {
+            ctx.fillStyle = '#1a2326';
+            ctx.fillRect(0, 0, W, H);
+            
+            ctx.fillStyle = '#2c5e4c';
+            ctx.fillRect(0, 0, W, 12);
+            ctx.fillRect(0, H-12, W, 12);
+            
+            ctx.fillStyle = '#253b3f';
+            ctx.fillRect(0, 12, W, H-24);
+            
+            ctx.globalAlpha = 0.18;
+            for(let i = 0; i < 240; i++) {
+                ctx.fillStyle = `rgba(180, 230, 240, ${Math.random() * 0.5})`;
+                ctx.fillRect(Math.random() * W, 12 + Math.random() * (H-24), 2, 3);
+                ctx.fillStyle = `rgba(0, 0, 0, ${Math.random() * 0.3})`;
+                ctx.fillRect(Math.random() * W, 12 + Math.random() * (H-24), 2, 2);
+            }
+            ctx.globalAlpha = 1;
+            
+            // Linhas laterais (azul vibrante)
+            ctx.beginPath();
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = "#6ed4ff";
+            ctx.moveTo(28, 12);
+            ctx.lineTo(28, H-12);
+            ctx.moveTo(W-28, 12);
+            ctx.lineTo(W-28, H-12);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = "#aaf0ff";
+            ctx.moveTo(34, 12);
+            ctx.lineTo(34, H-12);
+            ctx.moveTo(W-34, 12);
+            ctx.lineTo(W-34, H-12);
+            ctx.stroke();
+            
+            // Linha central tracejada (branca com movimento)
+            const dashLength = 38;
+            const gapLength = 40;
+            const patternLength = dashLength + gapLength;
+            const timeOffset = (Date.now() * 0.007) % patternLength;
+            
+            ctx.beginPath();
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = "#f0fcff";
+            ctx.setLineDash([dashLength, gapLength]);
+            ctx.lineDashOffset = -timeOffset;
+            const centerY = H / 2;
+            ctx.moveTo(42, centerY);
+            ctx.lineTo(W-42, centerY);
+            ctx.stroke();
+            
+            // Linhas secundárias (azul elétrico)
+            ctx.beginPath();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#3ad1f0";
+            ctx.setLineDash([22, 48]);
+            ctx.lineDashOffset = -timeOffset * 1.2;
+            ctx.moveTo(42, centerY - 18);
+            ctx.lineTo(W-42, centerY - 18);
+            ctx.moveTo(42, centerY + 18);
+            ctx.lineTo(W-42, centerY + 18);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Tachões refletivos
+            ctx.fillStyle = "#c0f2fc";
+            for(let y = 26; y < H-28; y += 44) {
+                ctx.fillRect(24, y, 5, 12);
+                ctx.fillRect(W-29, y, 5, 12);
+                ctx.fillStyle = "#60c0dd";
+                ctx.fillRect(25, y+2, 3, 8);
+                ctx.fillRect(W-28, y+2, 3, 8);
+                ctx.fillStyle = "#c0f2fc";
+            }
+        }
+        
+        function drawHUD() {
+            ctx.font = `bold 20px "Courier New", monospace`;
+            ctx.fillStyle = "#b5f0ff";
+            ctx.shadowBlur = 2;
+            ctx.shadowColor = "#005f70";
+            ctx.fillText(`💨 VEL: ${currentSpeed.toFixed(1)}`, W-128, 34);
+            ctx.fillStyle = "#ff964f";
+            ctx.fillText(`🚗 ${obstacles.length} veículos`, W-128, 64);
+            ctx.font = `bold 15px monospace`;
+            ctx.fillStyle = "#53ffe0";
+            ctx.fillText("← INIMIGOS (somente automóveis)", W-188, H-18);
+            ctx.shadowBlur = 0;
+        }
+        
+        function drawGameOver() {
+            ctx.fillStyle = "#00181ecc";
+            ctx.fillRect(0, 0, W, H);
+            ctx.font = `bold 38px "Segoe UI", "Courier New", monospace`;
+            ctx.fillStyle = "#ff7b5c";
+            ctx.textAlign = "center";
+            ctx.fillText("💥 GAME OVER 💥", W/2, H/2 - 55);
+            ctx.font = `28px monospace`;
+            ctx.fillStyle = "#fdea73";
+            ctx.fillText(`🏁 SCORE: ${score}`, W/2, H/2 + 20);
+            ctx.font = `18px monospace`;
+            ctx.fillStyle = "#9efffa";
+            ctx.fillText("Aperte REINICIAR ou [ R ] para nova corrida", W/2, H/2 + 95);
+            ctx.textAlign = "left";
+        }
+        
+        function render() {
+            drawBackground();
+            drawObstacles();
+            drawPlayer();
+            drawHUD();
+            if(!gameActive) {
+                drawGameOver();
+            }
+        }
+        
+        // ----- CONTROLES -----
+        function handleKeyDown(e) {
+            const key = e.key;
+            if(key === 'ArrowUp' || key === 'w' || key === 'W') {
+                upPressed = true;
+                e.preventDefault();
+            } else if(key === 'ArrowDown' || key === 's' || key === 'S') {
+                downPressed = true;
+                e.preventDefault();
+            } else if(key === 'r' || key === 'R') {
+                e.preventDefault();
+                resetGame();
+                updateUI();
+            }
+            if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(key)) {
+                e.preventDefault();
+            }
+        }
+        
+        function handleKeyUp(e) {
+            const key = e.key;
+            if(key === 'ArrowUp' || key === 'w' || key === 'W') {
+                upPressed = false;
+                e.preventDefault();
+            } else if(key === 'ArrowDown' || key === 's' || key === 'S') {
+                downPressed = false;
+                e.preventDefault();
+            }
+        }
+        
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        
+        window.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                if (e.target === document.body || e.target === document.documentElement) {
+                    e.preventDefault();
+                }
+            }
+        });
+        
+        resetBtn.addEventListener('click', () => {
+            resetGame();
+            updateUI();
+        });
+        
+        // Mobile touch
+        function handleTouchMove(e) {
+            if(!gameActive) return;
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const scaleY = H / rect.height;
+            let touchY = (e.touches[0].clientY - rect.top) * scaleY;
+            let newY = touchY - PLAYER_HEIGHT/2;
+            newY = Math.min(maxY, Math.max(minY, newY));
+            playerY = newY;
+            upPressed = false; downPressed = false;
+        }
+        
+        function handleTouchStart(e) {
+            e.preventDefault();
+            if(!gameActive) return;
+            const rect = canvas.getBoundingClientRect();
+            const scaleY = H / rect.height;
+            let touchY = (e.touches[0].clientY - rect.top) * scaleY;
+            let newY = touchY - PLAYER_HEIGHT/2;
+            newY = Math.min(maxY, Math.max(minY, newY));
+            playerY = newY;
+        }
+        
+        canvas.addEventListener('touchstart', handleTouchStart, {passive: false});
+        canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
+        canvas.addEventListener('touchend', (e) => e.preventDefault());
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+        
+        function init() {
+            resetGame();
+            updateDifficulty();
+            highScoreSpan.innerText = "0";
+            highScore = 0;
+            score = 0;
+            updateUI();
+            gameActive = true;
+            obstacles = [];
+            framesUntilSpawn = 10;
+            upPressed = false;
+            downPressed = false;
+            playerY = H/2 - PLAYER_HEIGHT/2;
+        }
+        
+        init();
+        
+        function gameLoop() {
+            updateGame();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        gameLoop();
+        
+        console.log("🏁 EMOTICON RACER — AGORA APENAS AUTOMÓVEIS! Lista de veículos variada, espelhados e cores vivas.");
+    })();
+</script>
+</body>
+</html>
